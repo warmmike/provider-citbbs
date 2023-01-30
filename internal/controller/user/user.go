@@ -32,13 +32,15 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
+	"citbbs/citbbs"
+
 	"github.com/crossplane/provider-citbbs/apis/user/v1alpha1"
 	apisv1alpha1 "github.com/crossplane/provider-citbbs/apis/v1alpha1"
 	"github.com/crossplane/provider-citbbs/internal/controller/features"
 )
 
 const (
-	errNotUser    = "managed resource is not a User custom resource"
+	errNotUser      = "managed resource is not a User custom resource"
 	errTrackPCUsage = "cannot track ProviderConfig usage"
 	errGetPC        = "cannot get ProviderConfig"
 	errGetCreds     = "cannot get credentials"
@@ -46,11 +48,18 @@ const (
 	errNewClient = "cannot create new Service"
 )
 
-// A NoOpService does nothing.
-type NoOpService struct{}
+// A citbbsService does nothing.
+type citbbsService struct {
+	citbbsCLI *citbbs.Client
+}
 
 var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
+	newcitbbsService = func(creds []byte) (*citbbsService, error) {
+		c, err := citbbs.NewClient(citbbs.WithAccessToken(string(creds)))
+		return &citbbsService{
+			citbbsCLI: c,
+		}, err
+	}
 )
 
 // Setup adds a controller that reconciles User managed resources.
@@ -67,7 +76,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithExternalConnecter(&connector{
 			kube:         mgr.GetClient(),
 			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			newServiceFn: newcitbbsService}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithConnectionPublishers(cps...))
@@ -84,7 +93,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (interface{}, error)
+	newServiceFn func(creds []byte) (*citbbsService, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -126,7 +135,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 type external struct {
 	// A 'client' used to connect to the external resource API. In practice this
 	// would be something like an AWS SDK client.
-	service interface{}
+	service *citbbsService
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
@@ -136,7 +145,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	c.service.citbbsCLI.Users.Create(ctx, &citbbs.CreateUserRequest{
+		Name: "thenoid",
+	})
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -161,7 +172,9 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotUser)
 	}
 
-	fmt.Printf("Creating: %+v", cr)
+	user, err := c.service.citbbsCLI.Users.Create(ctx, &citbbs.CreateUserRequest{
+		Name: "thenoid",
+	})
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the

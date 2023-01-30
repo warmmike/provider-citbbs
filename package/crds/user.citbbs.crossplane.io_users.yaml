@@ -63,11 +63,6 @@ spec:
                 type: string
               forProvider:
                 description: UserParameters are the configurable fields of a User.
-                properties:
-                  configurableField:
-                    type: string
-                required:
-                - configurableField
                 type: object
               providerConfigRef:
                 default:
@@ -247,6 +242,7 @@ spec:
                 description: UserObservation are the observable fields of a User.
                 properties:
                   observableField:
+                    description: '*optional'
                     type: string
                 type: object
               conditions:
