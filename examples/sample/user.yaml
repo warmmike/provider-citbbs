@@ -1,0 +1,9 @@
+apiVersion: user.citbbs.crossplane.io/v1alpha1
+kind: User
+metadata:
+  name: example
+spec:
+  forProvider:
+    name: test
+  providerConfigRef:
+    name: default

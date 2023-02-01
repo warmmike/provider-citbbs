@@ -21,19 +21,19 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/warmmike/citbbs-go/citbbs"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-
-	"citbbs/citbbs"
-
 	"github.com/crossplane/provider-citbbs/apis/user/v1alpha1"
 	apisv1alpha1 "github.com/crossplane/provider-citbbs/apis/v1alpha1"
 	"github.com/crossplane/provider-citbbs/internal/controller/features"
@@ -145,9 +145,28 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	// These fmt statements should be removed in the real implementation.
-	c.service.citbbsCLI.Users.Create(ctx, &citbbs.CreateUserRequest{
-		Name: "thenoid",
+	user, err := c.service.citbbsCLI.Users.Get(ctx, &citbbs.GetUserRequest{
+		User: meta.GetExternalName(cr),
 	})
+
+	if pErr, ok := err.(*citbbs.Error); ok && pErr.Code == citbbs.ErrNotFound {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	if user != nil {
+		cr.Status.SetConditions(xpv1.Available())
+	} else {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+
+	return managed.ExternalObservation{
+		ResourceExists:   true,
+		ResourceUpToDate: true,
+	}, nil
 
 	return managed.ExternalObservation{
 		// Return false when the external resource does not exist. This lets
@@ -173,9 +192,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	user, err := c.service.citbbsCLI.Users.Create(ctx, &citbbs.CreateUserRequest{
-		Name: "thenoid",
+		Name: meta.GetExternalName(cr),
 	})
 
+	if err != nil {
+		return managed.ExternalCreation{}, err
+	}
+
+	cr.Status.AtProvider.Name = user.Name
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
 		// external resource. These will be stored as the connection secret.
@@ -204,7 +228,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotUser)
 	}
 
-	fmt.Printf("Deleting: %+v", cr)
+	_, err := c.service.citbbsCLI.Users.Delete(ctx, &citbbs.DeleteUserRequest{
+		User: meta.GetExternalName(cr),
+	})
 
-	return nil
+	return err
 }

@@ -32,7 +32,7 @@ type UserParameters struct {
 // UserObservation are the observable fields of a User.
 type UserObservation struct {
 	// *optional
-	ObservableField string `json:"observableField,omitempty"`
+	Name string `json:"name"`
 }
 
 // A UserSpec defines the desired state of a User.
@@ -60,6 +60,7 @@ type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	Name   string     `json:"name"`
 	Spec   UserSpec   `json:"spec"`
 	Status UserStatus `json:"status,omitempty"`
 }
