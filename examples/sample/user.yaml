@@ -1,5 +1,6 @@
 apiVersion: user.citbbs.crossplane.io/v1alpha1
 kind: User
+name: example
 metadata:
   name: example
 spec:
